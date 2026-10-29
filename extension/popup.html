@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>biCaptcha Trust Pass</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo-shield"></div>
+      <h1>biCaptcha</h1>
+      <span class="badge">Trust Pass</span>
+    </div>
+    
+    <div id="loading" class="section">Yükleniyor...</div>
+    
+    <div id="unregistered" class="section hidden">
+      <p>Captcha'ları sıfır tıklamayla ve zaman kaybetmeden geçmek için gerçek bir insan olduğunuzu donanımınızla kanıtlayın.</p>
+      <button id="btn-register">Mühürlü Anahtar Oluştur</button>
+      <div class="note">Not: Donanım destekli anahtarlar dışarı sızdırılamaz.</div>
+    </div>
+    
+    <div id="registered" class="section hidden">
+      <div class="status-box">
+        <div class="icon-check"></div>
+        <h2>Cihaz Onaylı</h2>
+        <p>Bypass Kotası: <strong id="quota">500</strong> / 500</p>
+      </div>
+      <p class="pubkey-text">Public Key: <span id="pubkey-preview"></span>...</p>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

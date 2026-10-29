@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sites     Site[]
+}
+
+model Site {
+  id          String   @id @default(cuid())
+  domain      String
+  siteKey     String   @unique
+  secretKey   String
+  isVerified  Boolean  @default(false)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  logs        ValidationLog[]
+}
+
+model ValidationLog {
+  id        String   @id @default(cuid())
+  siteId    String
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  ip        String
+  country   String?  @default("Unknown")
+  type      String   // "Human", "Bot", "TrustPass"
+  riskScore Float
+  reason    String
+  createdAt DateTime @default(now())
+}
