@@ -1,111 +1,70 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import BiCaptcha from '@/components/BiCaptcha';
+import { ShieldCheck, Lock, Zap, Server } from 'lucide-react';
 
 export default function Home() {
-  const [mounted, setMounted] = useState(false);
-  const [name, setName] = useState('');
-  const [message, setMessage] = useState('');
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>('');
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!captchaToken) {
-      setStatus('Lütfen bekleyin, güvenlik kontrolü yapılıyor...');
-      return;
-    }
-
-    setStatus('Gönderiliyor...');
-
-    try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, message, biCaptchaToken: captchaToken })
-      });
-
-      const data = await res.json();
-      
-      if (res.ok) {
-        setStatus(`Başarılı! Risk Skoru: ${data.riskScore}`);
-        setName('');
-        setMessage('');
-        // Token kullanıldıktan sonra sıfırlanmalıdır. (Bir token sadece 1 kez kullanılır)
-        setCaptchaToken(null);
-      } else {
-        setStatus(`Hata: ${data.error || 'Bilinmeyen hata'}`);
-      }
-    } catch (err) {
-      setStatus('Bir ağ hatası oluştu.');
-    }
-  };
-
-  if (!mounted) return null;
-
   return (
-    <main className="min-h-screen flex items-center justify-center bg-zinc-950 p-4 font-sans">
-      <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden p-8">
-        <h1 className="text-2xl font-semibold text-white mb-6 tracking-tight">İletişim</h1>
+    <main className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-orange-500/30">
+      {/* Hero Section */}
+      <div className="max-w-6xl mx-auto px-6 py-24 flex flex-col items-center text-center">
+        <div className="flex items-center gap-3 mb-8 animate-fade-in">
+          <ShieldCheck className="w-12 h-12 text-orange-500" />
+          <h1 className="text-5xl font-bold tracking-tight">biCaptcha</h1>
+        </div>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-zinc-400 mb-1">Adınız</label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-              placeholder="Adınızı girin"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-zinc-400 mb-1">Mesajınız</label>
-            <textarea
-              required
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors h-32 resize-none"
-              placeholder="Mesajınızı buraya yazın..."
-            />
-          </div>
+        <p className="text-xl text-zinc-400 max-w-2xl mb-12 leading-relaxed">
+          Biyometrik davranış analizi ile çalışan, gizlilik odaklı ve self-hosted captcha alternatifi.
+          Botları durdurur, gerçek kullanıcıları yormaz.
+        </p>
 
-          {/* Görünür biCaptcha Widget Bileşeni */}
-          <div className="py-2">
-            <BiCaptcha 
-              siteKey="DEMO_SITE_KEY" 
-              action="contact_form"
-              onVerify={(token) => setCaptchaToken(token)} 
-            />
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl mt-12">
+          <FeatureCard 
+            icon={<Zap className="w-6 h-6 text-yellow-500" />}
+            title="Zero-Lag Deneyim"
+            description="Gerçek kullanıcılar tek tıkla veya otomatik doğrulanır. Yapay zeka tabanlı risk analizi arka planda çalışır."
+          />
+          <FeatureCard 
+            icon={<Lock className="w-6 h-6 text-blue-500" />}
+            title="Gelişmiş Bot Tespiti"
+            description="BAS, Puppeteer, Playwright ve anti-detect tarayıcıları tespit eden çok katmanlı telemetri analizi."
+          />
+          <FeatureCard 
+            icon={<Server className="w-6 h-6 text-green-500" />}
+            title="Tam Self-Hosted"
+            description="Verileriniz sizin sunucunuzda kalır. SQLite/PostgreSQL desteği ile kolay kurulum ve ölçeklendirme."
+          />
+        </div>
 
-          <button
-            type="submit"
-            disabled={!captchaToken}
-            className={`w-full py-2.5 rounded-lg font-medium transition-all ${
-              captchaToken 
-                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' 
-                : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-            }`}
-          >
-            {captchaToken ? 'Gönder' : 'Güvenlik Kontrolü Bekleniyor...'}
-          </button>
-        </form>
+        <div className="mt-16 p-6 bg-zinc-900/50 border border-zinc-800 rounded-2xl max-w-3xl w-full">
+          <h3 className="text-lg font-semibold mb-4 text-zinc-200">Hızlı Başlangıç</h3>
+          <pre className="text-left bg-zinc-950 p-4 rounded-lg overflow-x-auto text-sm text-zinc-300 border border-zinc-800">
+{`# 1. Bağımlılıkları yükle
+npm install
 
-        {status && (
-          <div className="mt-4 p-3 rounded-lg bg-zinc-800/50 text-sm text-zinc-300 text-center border border-zinc-700/50">
-            {status}
-          </div>
-        )}
+# 2. Ortam değişkenlerini ayarla
+cp .env.example .env.local
+
+# 3. Veritabanını oluştur
+npx prisma migrate dev --name init
+
+# 4. Client script'i derle
+npm run build:client
+
+# 5. Geliştirme sunucusunu başlat
+npm run dev`}
+          </pre>
+        </div>
       </div>
     </main>
+  );
+}
+
+function FeatureCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl hover:border-orange-500/50 transition-colors text-left group">
+      <div className="mb-4 p-3 bg-zinc-950 rounded-lg w-fit group-hover:scale-110 transition-transform">{icon}</div>
+      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      <p className="text-sm text-zinc-400 leading-relaxed">{description}</p>
+    </div>
   );
 }
