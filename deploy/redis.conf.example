@@ -1,0 +1,9 @@
+bind 0.0.0.0
+protected-mode yes
+port 6379
+appendonly yes
+appendfsync always
+maxmemory 256mb
+maxmemory-policy noeviction
+# The Compose entrypoint substitutes REDIS_PASSWORD from the operator secret environment.
+requirepass REPLACE_WITH_INDEPENDENT_RANDOM_PASSWORD

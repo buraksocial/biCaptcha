@@ -1,33 +1,19 @@
-import { NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
-export async function POST(req: Request) {
+import { prisma } from '@/lib/prisma';
+import { authInput } from '@/lib/security/auth';
+import { signingKey } from '@/lib/security/config';
+import { csrf, failure, json, rate, readJson } from '@/lib/security/http';
+export async function POST(request: Request) {
   try {
-    const { email, password, name } = await req.json();
-
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
-    }
-
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return NextResponse.json({ error: 'Email already in use' }, { status: 400 });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name
-      }
-    });
-
-    return NextResponse.json({ success: true, user: { id: user.id, email: user.email } });
-  } catch (error) {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
-  }
+    signingKey('JWT_SECRET');
+    csrf(request);
+    await rate('register-global', 'global', 10);
+    const { email, password, name } = authInput(await readJson(request, 2048));
+    await rate('register-account', email, 3, 3600);
+    const hashed = await bcrypt.hash(password, 12);
+    try { await prisma.user.create({ data: { email, password: hashed, name } }); }
+    catch (error) { if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'P2002') throw error; }
+    // Same response for existing/new accounts; no password or DB object returned.
+    return json({ success: true });
+  } catch (error) { return failure(error); }
 }

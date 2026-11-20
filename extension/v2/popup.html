@@ -1,0 +1,6 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Trust Pass v2</title><link rel="stylesheet" href="popup.css"></head>
+<body><main><h1>Trust Pass v2</h1><p>Only explicitly configured HTTPS sites. Maximum 15 minutes and 20 passes. Allowed sites can spend this budget. This is not proof of humanity.</p>
+<button id="key">Show public device key</button><label>Public key for dashboard<textarea id="public" readonly></textarea></label>
+<label>Grant configuration from your deployment dashboard<textarea id="grant" maxlength="8192"></textarea></label>
+<button id="enable">Review scope and enable</button><button id="disable">Disable all local automatic passes</button><p>For server-side account/device/grant revocation, use your deployment dashboard. Logout revokes account grants.</p><p id="status" role="status"></p></main><script src="popup.js"></script></body></html>

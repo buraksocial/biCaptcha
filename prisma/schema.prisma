@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -22,12 +22,14 @@ model Site {
   domain      String
   siteKey     String   @unique
   secretKey   String
+  verificationSecretHash String?
   isVerified  Boolean  @default(false)
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   logs        ValidationLog[]
+  @@unique([userId, domain])
 }
 
 model ValidationLog {
@@ -39,5 +41,7 @@ model ValidationLog {
   type      String   // "Human", "Bot", "TrustPass"
   riskScore Float
   reason    String
+  latencyMs Int?
   createdAt DateTime @default(now())
+  @@index([siteId, createdAt])
 }

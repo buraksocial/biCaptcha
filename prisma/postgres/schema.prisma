@@ -1,0 +1,46 @@
+// Separate production target. SQLite schema and migration history are untouched.
+generator client {
+  provider = "prisma-client-js"
+  output = "../../node_modules/.prisma/client-pg"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  password String
+  name String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sites Site[]
+}
+model Site {
+  id String @id @default(cuid())
+  domain String
+  siteKey String @unique
+  secretKey String
+  verificationSecretHash String?
+  isVerified Boolean @default(false)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  logs ValidationLog[]
+  @@unique([userId, domain])
+}
+model ValidationLog {
+  id String @id @default(cuid())
+  siteId String
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  ip String
+  country String? @default("Unknown")
+  type String
+  riskScore Float
+  reason String
+  latencyMs Int?
+  createdAt DateTime @default(now())
+  @@index([siteId, createdAt])
+}
+// Security ledger tables are managed by additive SQL migration, accessed through pg.

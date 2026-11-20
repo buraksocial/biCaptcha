@@ -1,27 +1,31 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import PilotControls from '@/components/PilotControls';
 import { useRouter } from 'next/navigation';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts';
 import { 
-  ShieldAlert, ShieldCheck, Zap, Activity, Users, 
-  Fingerprint, MousePointer2, Cpu, Globe, LogOut, Plus, CheckCircle2
+  ShieldAlert, ShieldCheck, Zap, Users,
+  Fingerprint, MousePointer2, Cpu, Globe, LogOut, Plus
 } from 'lucide-react';
 
+interface Site { id: string; domain: string; siteKey: string; isVerified: boolean }
+interface Risk { name: string; value: number; color: string }
+interface Log { id: string; ip: string; country: string; type: string; score: number; reason: string; time: string }
 export default function DashboardPage() {
-  const [mounted, setMounted] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ email: string; name: string | null } | null>(null);
   const [activeTab, setActiveTab] = useState<'analytics' | 'sites'>('analytics');
   
   // Data States
-  const [trafficData, setTrafficData] = useState([]);
-  const [stats, setStats] = useState({ total: 0, bots: 0, trustPass: 0, avgLatency: 0 });
-  const [riskData, setRiskData] = useState([]);
-  const [recentLogs, setRecentLogs] = useState<any[]>([]);
-  const [sites, setSites] = useState<any[]>([]);
+  const [trafficData, setTrafficData] = useState<Array<{ date: string; Human: number; Bot: number; TrustPass: number }>>([]);
+  const [stats, setStats] = useState<{ total: number; bots: number; trustPass: number; avgLatency: number | null }>({ total: 0, bots: 0, trustPass: 0, avgLatency: null });
+  const [riskData, setRiskData] = useState<Risk[]>([]);
+  const [recentLogs, setRecentLogs] = useState<Log[]>([]);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [oneTimeSecret, setOneTimeSecret] = useState('');
   const [loading, setLoading] = useState(true);
   
   // New Site State
@@ -30,28 +34,7 @@ export default function DashboardPage() {
   
   const router = useRouter();
 
-  useEffect(() => {
-    setMounted(true);
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const res = await fetch('/api/auth/me');
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user);
-        fetchAnalytics();
-        fetchSites();
-      } else {
-        router.push('/login');
-      }
-    } catch (e) {
-      router.push('/login');
-    }
-  };
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       const res = await fetch('/api/analytics');
       if (res.ok) {
@@ -64,15 +47,27 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchSites = async () => {
+  const fetchSites = useCallback(async () => {
     const res = await fetch('/api/sites');
     if (res.ok) {
       const data = await res.json();
       setSites(data.sites);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/auth/me', { signal: controller.signal }).then(async res => {
+      if (!res.ok) { router.push('/login'); return; }
+      const data = await res.json();
+      if (controller.signal.aborted) return;
+      setUser(data.user);
+      await Promise.all([fetchAnalytics(), fetchSites()]);
+    }).catch(() => { if (!controller.signal.aborted) router.push('/login'); });
+    return () => controller.abort();
+  }, [router, fetchAnalytics, fetchSites]);
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -89,6 +84,8 @@ export default function DashboardPage() {
         body: JSON.stringify({ domain: newDomain })
       });
       if (res.ok) {
+        const data = await res.json();
+        setOneTimeSecret(data.verificationSecret);
         setNewDomain('');
         fetchSites();
       }
@@ -106,12 +103,19 @@ export default function DashboardPage() {
       } else {
         alert('Verification failed. Are you sure you added the TXT record?');
       }
-    } catch (e) {
+    } catch {
       alert('Error verifying site.');
     }
   };
 
-  if (!mounted || !user) return null;
+  const rotateSecret = async (id: string) => {
+    if (!confirm('Rotate backend credential? The previous credential stops working immediately.')) return;
+    const response = await fetch(`/api/sites/${id}/rotate-secret`, { method: 'POST' });
+    if (response.ok) setOneTimeSecret((await response.json()).verificationSecret);
+    else alert('Credential rotation failed.');
+  };
+
+  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans selection:bg-blue-500/30">
@@ -156,6 +160,7 @@ export default function DashboardPage() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <PilotControls />
         
         {activeTab === 'sites' ? (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -188,6 +193,11 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-4">
+              {oneTimeSecret && <div className="border border-orange-500 rounded-lg p-4 text-sm" role="status">
+                <p>Backend credential — shown once. Store only on your server. Never embed it in JavaScript.</p>
+                <code className="block break-all select-all my-2">{oneTimeSecret}</code>
+                <button type="button" onClick={() => setOneTimeSecret('')}>Dismiss credential</button>
+              </div>}
               {sites.map(site => (
                 <div key={site.id} className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
@@ -205,10 +215,8 @@ export default function DashboardPage() {
                         <span className="text-zinc-500 w-20 inline-block">SiteKey:</span>
                         <code className="bg-zinc-950 px-2 py-1 rounded text-blue-400 border border-zinc-800 font-mono text-xs select-all">{site.siteKey}</code>
                       </div>
-                      {/* For security reasons, don't display SecretKey fully, but it's okay for POC */}
                       <div className="text-sm">
-                        <span className="text-zinc-500 w-20 inline-block">SecretKey:</span>
-                        <code className="bg-zinc-950 px-2 py-1 rounded text-red-400 border border-zinc-800 font-mono text-xs select-all">{site.secretKey}</code>
+                        <button type="button" onClick={() => rotateSecret(site.id)} className="text-blue-400">Rotate backend credential</button>
                       </div>
                     </div>
                   </div>
@@ -233,7 +241,7 @@ export default function DashboardPage() {
               {sites.length === 0 && (
                 <div className="text-center py-12 bg-zinc-900/30 border border-zinc-800/50 rounded-xl border-dashed">
                   <Globe className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-                  <p className="text-zinc-400">You haven't added any domains yet.</p>
+                  <p className="text-zinc-400">You have not added any domains yet.</p>
                 </div>
               )}
             </div>
@@ -244,9 +252,9 @@ export default function DashboardPage() {
             {/* PAGE TITLE */}
             <div className="mb-8">
               <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-zinc-100 to-zinc-500">
-                Real-time Analytics
+                Validation Analytics
               </h1>
-              <p className="text-zinc-400 mt-1">Monitor bot attacks, traffic anomalies, and user verifications across your network.</p>
+              <p className="text-zinc-300 mt-1">Opt-in validation metrics. Client risk scores are advisory, not proof of bots or humans. Legacy Trust Pass remains disabled; scoped v2 is available below only when enabled by the operator.</p>
             </div>
 
             {loading ? (
@@ -257,7 +265,7 @@ export default function DashboardPage() {
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-8 text-center max-w-2xl mx-auto mt-12">
                 <ShieldCheck className="w-12 h-12 text-blue-400 mx-auto mb-4" />
                 <h3 className="text-xl font-bold text-blue-100 mb-2">Welcome to biCaptcha!</h3>
-                <p className="text-blue-200/70 mb-6">To see analytics, you must first add a domain and verify it via DNS in the "My Sites" tab.</p>
+                <p className="text-blue-200/70 mb-6">To see analytics, add a domain and verify it via DNS in the My Sites tab.</p>
                 <button 
                   onClick={() => setActiveTab('sites')}
                   className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-500 font-medium"
@@ -287,7 +295,7 @@ export default function DashboardPage() {
                     <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full blur-3xl -mr-10 -mt-10 transition-all group-hover:bg-red-500/20"></div>
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <p className="text-zinc-400 text-sm font-medium mb-1">Blocked Bots</p>
+                        <p className="text-zinc-400 text-sm font-medium mb-1">Legacy Bot Labels</p>
                         <h3 className="text-3xl font-bold text-zinc-100">{stats.bots}</h3>
                       </div>
                       <div className="p-2 bg-red-500/10 rounded-lg text-red-400 border border-red-500/20">
@@ -300,7 +308,7 @@ export default function DashboardPage() {
                     <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl -mr-10 -mt-10 transition-all group-hover:bg-orange-500/20"></div>
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <p className="text-zinc-400 text-sm font-medium mb-1">Trust Pass Logins</p>
+                        <p className="text-zinc-400 text-sm font-medium mb-1">Legacy Trust Pass (disabled)</p>
                         <h3 className="text-3xl font-bold text-zinc-100">{stats.trustPass}</h3>
                       </div>
                       <div className="p-2 bg-orange-500/10 rounded-lg text-orange-400 border border-orange-500/20">
@@ -314,7 +322,7 @@ export default function DashboardPage() {
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <p className="text-zinc-400 text-sm font-medium mb-1">Avg. Latency</p>
-                        <h3 className="text-3xl font-bold text-zinc-100">{stats.avgLatency}ms</h3>
+                        <h3 className="text-3xl font-bold text-zinc-100">{stats.avgLatency === null ? 'N/A' : `${stats.avgLatency}ms`}</h3>
                       </div>
                       <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400 border border-emerald-500/20">
                         <Zap className="w-5 h-5" />
@@ -386,7 +394,7 @@ export default function DashboardPage() {
                               dataKey="value"
                               stroke="none"
                             >
-                              {riskData.map((entry: any, index: number) => (
+                              {riskData.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.color} />
                               ))}
                             </Pie>
@@ -399,7 +407,7 @@ export default function DashboardPage() {
                       </div>
                       
                       <div className="mt-6 space-y-3">
-                        {riskData.map((item: any, i: number) => (
+                        {riskData.map((item, i) => (
                           <div key={i} className="flex justify-between items-center text-sm">
                             <div className="flex items-center gap-2">
                               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
@@ -446,7 +454,7 @@ export default function DashboardPage() {
                               <span className="font-mono text-zinc-300">{log.ip}</span>
                             </td>
                             <td className="px-6 py-4">
-                              {log.type === 'Human' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><ShieldCheck className="w-3.5 h-3.5"/> Verified</span>}
+                              {['Human', 'Verified'].includes(log.type) && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><ShieldCheck className="w-3.5 h-3.5"/> Verified</span>}
                               {log.type === 'Bot' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-500/10 text-red-400 border border-red-500/20"><ShieldAlert className="w-3.5 h-3.5"/> Blocked</span>}
                               {log.type === 'TrustPass' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-orange-500/10 text-orange-400 border border-orange-500/20"><Fingerprint className="w-3.5 h-3.5"/> Trust Pass</span>}
                             </td>

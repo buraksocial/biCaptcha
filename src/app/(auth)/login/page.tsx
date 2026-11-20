@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, ShieldAlert, Key } from 'lucide-react';
+import { ShieldCheck, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LoginPage() {
@@ -30,7 +30,7 @@ export default function LoginPage() {
       } else {
         setError(data.error || 'Login failed');
       }
-    } catch (e) {
+    } catch {
       setError('Network error');
     } finally {
       setLoading(false);
@@ -62,7 +62,9 @@ export default function LoginPage() {
           <div>
             <label className="block text-sm font-medium text-zinc-400 mb-1">Email</label>
             <input 
-              type="email" 
+              type="email"
+              maxLength={254}
+              autoComplete="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-zinc-100 focus:outline-none focus:border-blue-500 transition-colors"
@@ -72,7 +74,10 @@ export default function LoginPage() {
           <div>
             <label className="block text-sm font-medium text-zinc-400 mb-1">Password</label>
             <input 
-              type="password" 
+              type="password"
+              minLength={12}
+              maxLength={72}
+              autoComplete="current-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-zinc-100 focus:outline-none focus:border-blue-500 transition-colors"
@@ -89,7 +94,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-zinc-500 text-sm mt-6">
-          Don't have an account? <Link href="/register" className="text-blue-400 hover:text-blue-300">Sign up</Link>
+          Do not have an account? <Link href="/register" className="text-blue-400 hover:text-blue-300">Sign up</Link>
         </p>
       </div>
     </div>

@@ -1,35 +1,17 @@
-import { NextResponse } from 'next/server';
 import { verifyCaptcha } from '@/lib/verifyCaptcha';
-
+import { csrf, failure, HttpError, json, rate, readJson, text } from '@/lib/security/http';
+import { Unavailable } from '@/lib/security/config';
 export async function POST(request: Request) {
   try {
-    const { name, message, biCaptchaToken } = await request.json();
-
-    // 1. Verify the invisible captcha token before processing the request
-    const captchaResult = await verifyCaptcha(biCaptchaToken);
-
-    if (!captchaResult.success) {
-      return NextResponse.json({ 
-        error: 'Bot detected or captcha failed', 
-        details: captchaResult.error 
-      }, { status: 403 });
-    }
-
-    // Optional: Check risk score for extra security
-    // if (captchaResult.riskScore && captchaResult.riskScore > 0.4) {
-    //   return NextResponse.json({ error: 'High risk interaction' }, { status: 403 });
-    // }
-
-    // 2. Process the actual form submission
-    console.log(`Received message from ${name}: ${message}. Risk Score: ${captchaResult.riskScore}`);
-
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Message sent successfully!',
-      riskScore: captchaResult.riskScore
-    });
-
-  } catch (error) {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-  }
+    csrf(request);
+    await rate('contact', 'global', 30);
+    const site = process.env.DEMO_SITE_KEY, host = process.env.DEMO_HOSTNAME;
+    if (!site || !host) throw new Unavailable('Demo not configured');
+    const body = await readJson(request, 8192);
+    text(body.name, 100); text(body.message, 4000);
+    const result = await verifyCaptcha(text(body.biCaptchaToken, 2048), site, 'contact', host);
+    if (!result.success) throw new HttpError(403);
+    // Demo only: no PII is logged and no message-delivery backend is implied.
+    return json({ success: true, message: 'Demo submission verified; no message was sent.' });
+  } catch (error) { return failure(error); }
 }

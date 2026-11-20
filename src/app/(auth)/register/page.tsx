@@ -37,7 +37,7 @@ export default function RegisterPage() {
       } else {
         setError(data.error || 'Registration failed');
       }
-    } catch (e) {
+    } catch {
       setError('Network error');
     } finally {
       setLoading(false);
@@ -79,7 +79,9 @@ export default function RegisterPage() {
           <div>
             <label className="block text-sm font-medium text-zinc-400 mb-1">Email</label>
             <input 
-              type="email" 
+              type="email"
+              maxLength={254}
+              autoComplete="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-zinc-100 focus:outline-none focus:border-orange-500 transition-colors"
@@ -89,7 +91,10 @@ export default function RegisterPage() {
           <div>
             <label className="block text-sm font-medium text-zinc-400 mb-1">Password</label>
             <input 
-              type="password" 
+              type="password"
+              minLength={12}
+              maxLength={72}
+              autoComplete="new-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-zinc-100 focus:outline-none focus:border-orange-500 transition-colors"

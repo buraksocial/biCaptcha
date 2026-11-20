@@ -1,0 +1,16 @@
+{
+  "mode": "off",
+  "current": "0.2.0",
+  "schema": 1,
+  "origin": "https://YOUR-REAL-RELEASE-ORIGIN.example",
+  "manifest": "https://YOUR-REAL-RELEASE-ORIGIN.example/stable/manifest.json",
+  "trustRoot": "/operator/reviewed-release-root.pem",
+  "state": "/operator/updater-state.json",
+  "staging": "/operator/staged-updates",
+  "maintenanceUTC": [2, 4],
+  "composeFile": "/opt/bicaptcha/compose.yaml",
+  "projectDir": "/opt/bicaptcha",
+  "imageRepository": "registry.example.com/bicaptcha/app",
+  "backupReceipt": "/opt/bicaptcha/backup-restore-receipt.json",
+  "platform": "linux/amd64"
+}

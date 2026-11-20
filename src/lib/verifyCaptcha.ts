@@ -1,31 +1,15 @@
-import { jwtVerify } from 'jose';
+import { captchaService } from './security/runtime';
+import { context } from './security/captcha';
+import { Unavailable } from './security/config';
 
-const VERIFY_SECRET_KEY = new TextEncoder().encode(process.env.BICAPTCHA_VERIFY_SECRET || 'another-super-secret-key-32-chars-long');
-
-export interface BiCaptchaResult {
-  success: boolean;
-  riskScore?: number;
-  error?: string;
-}
-
-export async function verifyCaptcha(token: string): Promise<BiCaptchaResult> {
-  if (!token) {
-    return { success: false, error: 'Token is required' };
-  }
-
+/** Same-deployment server helper. External backends MUST use central siteverify.
+ * Expected values come from backend configuration, NEVER the untrusted token/body.
+ */
+export async function verifyCaptcha(token: string, expectedSite: string, expectedAction: string, expectedHost: string) {
   try {
-    const { payload } = await jwtVerify(token, VERIFY_SECRET_KEY);
-    
-    // Check if the payload says it was verified
-    if (payload.verified === true) {
-      return { 
-        success: true, 
-        riskScore: payload.riskScore as number
-      };
-    } else {
-      return { success: false, error: 'Token is not marked as verified' };
-    }
+    return await captchaService().consume(token, context({ siteKey: expectedSite, action: expectedAction, host: expectedHost }));
   } catch (error) {
-    return { success: false, error: 'Invalid or expired captcha token' };
+    if (error instanceof Unavailable) throw error;
+    return { success: false as const };
   }
 }

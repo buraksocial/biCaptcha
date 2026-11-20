@@ -1,18 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import BiCaptcha from '@/components/BiCaptcha';
 
 export default function Home() {
-  const [mounted, setMounted] = useState(false);
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [widgetVersion, setWidgetVersion] = useState(0);
+  const siteKey = process.env.NEXT_PUBLIC_DEMO_SITE_KEY;
+  const apiBase = process.env.NEXT_PUBLIC_BICAPTCHA_API_BASE;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +32,7 @@ export default function Home() {
       const data = await res.json();
       
       if (res.ok) {
-        setStatus(`Başarılı! Risk Skoru: ${data.riskScore}`);
+        setStatus('Demo doğrulandı; mesaj gönderilmedi.');
         setName('');
         setMessage('');
         // Token kullanıldıktan sonra sıfırlanmalıdır. (Bir token sadece 1 kez kullanılır)
@@ -42,12 +40,13 @@ export default function Home() {
       } else {
         setStatus(`Hata: ${data.error || 'Bilinmeyen hata'}`);
       }
-    } catch (err) {
+    } catch {
       setStatus('Bir ağ hatası oluştu.');
+    } finally {
+      setCaptchaToken(null);
+      setWidgetVersion(v => v + 1);
     }
   };
-
-  if (!mounted) return null;
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-zinc-950 p-4 font-sans">
@@ -60,6 +59,7 @@ export default function Home() {
             <input
               type="text"
               required
+              maxLength={100}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
@@ -71,6 +71,7 @@ export default function Home() {
             <label className="block text-sm font-medium text-zinc-400 mb-1">Mesajınız</label>
             <textarea
               required
+              maxLength={4000}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               className="w-full px-4 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors h-32 resize-none"
@@ -80,11 +81,13 @@ export default function Home() {
 
           {/* Görünür biCaptcha Widget Bileşeni */}
           <div className="py-2">
-            <BiCaptcha 
-              siteKey="DEMO_SITE_KEY" 
-              action="contact_form"
+            {siteKey && apiBase ? <BiCaptcha
+              key={widgetVersion}
+              siteKey={siteKey}
+              apiBase={apiBase}
+              action="contact"
               onVerify={(token) => setCaptchaToken(token)} 
-            />
+            /> : <p className="text-sm text-zinc-400">Demo yapılandırılmadı. Doğrulanmış HTTPS domain ve site anahtarı gereklidir.</p>}
           </div>
 
           <button

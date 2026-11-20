@@ -1,58 +1,28 @@
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import jwt from 'jsonwebtoken';
-import { cookies } from 'next/headers';
-import crypto from 'crypto';
-
-const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'bi-captcha-super-secret-jwt-key';
-
-async function getUser() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('bicaptcha_session')?.value;
-  if (!token) return null;
+import { randomBytes } from 'node:crypto';
+import { prisma } from '@/lib/prisma';
+import { requireUser } from '@/lib/security/auth';
+import { canonicalDomain } from '@/lib/security/domain';
+import { createCredential } from '@/lib/security/credentials';
+import { publicSiteFields } from '@/lib/security/sites';
+import { csrf, failure, HttpError, json, rate, readJson } from '@/lib/security/http';
+export async function GET(request: Request) {
   try {
-    return jwt.verify(token, JWT_SECRET) as { userId: string };
-  } catch (e) {
-    return null;
-  }
+    const user = await requireUser(request);
+    const query = new URL(request.url).searchParams;
+    const page = Number(query.get('page') ?? 1);
+    if (!Number.isInteger(page) || page < 1 || page > 1000) throw new HttpError(400);
+    return json({ sites: await prisma.site.findMany({ where: { userId: user.id }, select: publicSiteFields, orderBy: { createdAt: 'desc' }, take: 50, skip: (page - 1) * 50 }), page });
+  } catch (error) { return failure(error); }
 }
-
-export async function GET() {
-  const user = await getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const sites = await prisma.site.findMany({
-    where: { userId: user.userId },
-    orderBy: { createdAt: 'desc' }
-  });
-
-  return NextResponse.json({ sites });
-}
-
-export async function POST(req: Request) {
-  const user = await getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
+export async function POST(request: Request) {
   try {
-    const { domain } = await req.json();
-    if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 });
-
-    // Generate keys
-    const siteKey = 'bicaptcha_' + crypto.randomBytes(16).toString('hex');
-    const secretKey = 'sec_' + crypto.randomBytes(24).toString('hex');
-
-    const site = await prisma.site.create({
-      data: {
-        domain,
-        siteKey,
-        secretKey,
-        userId: user.userId
-      }
-    });
-
-    return NextResponse.json({ success: true, site });
-  } catch (e) {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
-  }
+    csrf(request);
+    const user = await requireUser(request);
+    await rate('site-create', user.id, 10);
+    const body = await readJson(request, 1024);
+    const domain = canonicalDomain(body.domain);
+    const credential = createCredential();
+    const site = await prisma.site.create({ data: { domain, userId: user.id, siteKey: `bicaptcha_${randomBytes(16).toString('hex')}`, secretKey: '', verificationSecretHash: credential.hash }, select: publicSiteFields });
+    return json({ success: true, site, verificationSecret: credential.secret }, 201);
+  } catch (error) { return failure(error); }
 }

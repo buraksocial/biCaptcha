@@ -1,0 +1,67 @@
+name: bicaptcha
+services:
+  ingress:
+    image: nginx:1.28-alpine
+    ports: ["443:443"]
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/tls:/etc/nginx/tls:ro
+    depends_on:
+      app: { condition: service_healthy }
+    networks: [edge]
+    restart: unless-stopped
+  app:
+    build: .
+    image: ${BICAPTCHA_APP_IMAGE:-bicaptcha:0.2.0}
+    pull_policy: never
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      BICAPTCHA_STATE: redis
+      BICAPTCHA_INGRESS: isolated-tls
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set an independent Postgres password}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set an independent Redis password}
+    networks: [edge, state]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: bicaptcha
+      POSTGRES_USER: bicaptcha
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set an independent Postgres password}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    networks: [state]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bicaptcha -d bicaptcha"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: ["sh", "-ec", "exec redis-server --appendonly yes --appendfsync always --maxmemory 256mb --maxmemory-policy noeviction --requirepass \"$REDIS_PASSWORD\""]
+    volumes: ["redisdata:/data"]
+    networks: [state]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set an independent Redis password}
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?Set an independent Redis password}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+networks:
+  edge: {}
+  state: { internal: true }
+volumes:
+  pgdata: {}
+  redisdata: {}

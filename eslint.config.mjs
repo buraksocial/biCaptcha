@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Separate vendored reference project; not this application's test/lint scope.
+    "cap-main/**",
+    "public/bicaptcha.js",
   ]),
 ]);
 
